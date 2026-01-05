@@ -94,12 +94,17 @@ with gr.Blocks() as demo:
     description = gr.HTML("<p>Upload a database (.db) file, or use a sample database provided. Enter a query in natural language, and the app will generate and execute the corresponding SQL query.</p>")
     db_upload_button = gr.UploadButton(label="Upload DB file",
                                 file_count="single")
-    db_schema_df = gr.DataFrame(value=get_db_schema(uploaded_filepath),
-                                label="DB Schema")
-    query_input = gr.Textbox(lines=5, label="Enter your query in natural language")
-    query_submit_button = gr.Button(value="Submit")
-    generated_query = gr.Textbox(label="Generated SQL Query")
-    query_result = gr.DataFrame(label="Query Result")
+    db_schema_df = gr.Dataframe(value=get_db_schema(uploaded_filepath),
+                                label="DB Schema",
+                                max_height=200)
+    with gr.Row():
+        with gr.Column():
+            query_input = gr.Textbox(lines=5, label="Enter your query in natural language")
+            query_submit_button = gr.Button(value="Submit")
+        with gr.Column():
+            generated_query = gr.Textbox(label="Generated SQL Query")
+            query_result = gr.Dataframe(label="Query Result",
+                                        max_height=200)
 
     # Listeners
     db_upload_button.upload(
