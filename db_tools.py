@@ -1,5 +1,6 @@
 import sqlite3
 import pandas as pd
+from config import schema
 
 def get_db_schema(db_path: str) -> pd.DataFrame:
     """Retrieves the database schema, saves it as a global schema string and returns it as a DataFrame."""

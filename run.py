@@ -3,7 +3,8 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import sqlite3
 import pandas as pd
-from database import get_db_schema
+from db_tools import get_db_schema
+from config import schema
 
 # Initialize tokenizer and model
 if torch.cuda.is_available():
@@ -87,7 +88,7 @@ def upload_db(file_obj) -> pd.DataFrame:
 # Create the Gradio interface
 DEFAULT_DB_FILEPATH = "northwind.db"
 uploaded_filepath = DEFAULT_DB_FILEPATH
-schema = ""
+
 with gr.Blocks() as demo:
     title = gr.HTML("<h1>Natural Language to SQL Query</h1>")
     description = gr.HTML("<p>Upload a database (.db) file, or use a sample database provided. Enter a query in natural language, and the app will generate and execute the corresponding SQL query.</p>")
