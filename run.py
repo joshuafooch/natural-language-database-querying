@@ -3,6 +3,7 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import sqlite3
 import pandas as pd
+from database import get_db_schema
 
 # Initialize tokenizer and model
 if torch.cuda.is_available():
@@ -14,53 +15,6 @@ tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-Coder-0.5B-Instruct")
 model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2.5-Coder-0.5B-Instruct")
 model.to(device)
 print("Model loaded to", model.device)
-
-def get_db_schema(db_path: str) -> pd.DataFrame:
-    """Retrieves the database schema, saves it as a global schema string and returns it as a DataFrame."""
-    conn = sqlite3.connect(db_path)
-    query = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"
-    tables_df = pd.read_sql_query(query, conn)
-    conn.close()
-
-    db_schema_df = pd.DataFrame()
-    for table_name in tables_df["name"]:
-        db_schema_df = pd.concat([db_schema_df, get_table_schema(db_path, table_name)],
-                  axis=1)
-
-    return db_schema_df.fillna("")
-
-def get_table_schema(db_path: str, table_name: str) -> pd.Series:
-    """Retrieves the schema (columns) for a specified table."""
-    global schema
-    conn = sqlite3.connect(db_path)
-    query = f"PRAGMA table_info('{table_name}');"
-    column_df = pd.read_sql_query(query, conn)
-    conn.close()
-    column_df = column_df.rename(columns={"name": table_name})
-    table_schema = f"Table: {table_name}\\n"
-    for col in column_df[table_name]:
-        table_schema += f"  Column: {col}\\n"
-    schema += table_schema
-    return column_df[table_name]
-
-def get_table_schema_string(db_path: str, table_name) -> str:
-    """
-    Extracts the table schema (name and columns) as a string.
-    """
-    with sqlite3.connect(db_path) as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = cursor.fetchall()
-        schema = ""
-        for table_name in tables:
-            table_name = table_name[0]
-            schema += f"Table: {table_name}\\n"
-            cursor.execute(f"PRAGMA table_info({table_name});")
-            columns = cursor.fetchall()
-            for col in columns:
-                schema += f"  Column: {col[1]} ({col[2]})\\n"
-    return schema
-
 
 def nL_to_sql(question: str) -> str:
     """
@@ -99,7 +53,7 @@ def nL_to_sql(question: str) -> str:
     print(sql_query)
     return sql_query
 
-def execute_query(sql_query: str):
+def execute_query(sql_query: str) -> pd.DataFrame:
     """
     Executes a SQL query on the database and returns the result.
     """
@@ -111,7 +65,7 @@ def execute_query(sql_query: str):
     except Exception as e:
         return pd.DataFrame()
 
-def process_input(natural_language_query):
+def process_input(natural_language_query: str) -> tuple[str, pd.DataFrame]:
     """
     Processes the natural language query, generates SQL, and executes it.
     """
@@ -120,6 +74,9 @@ def process_input(natural_language_query):
     return sql_query, result
 
 def upload_db(file_obj) -> pd.DataFrame:
+    """
+    Updates file path of user-uploaded database file, and returns the schema (tables and columns) as a DataFrame.
+    """
     global uploaded_filepath
     if file_obj is None:
         return pd.DataFrame()
