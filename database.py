@@ -1,66 +1,48 @@
 import sqlite3
+import pandas as pd
 
-def create_database():
-    conn = sqlite3.connect('chinook.db')
-    c = conn.cursor()
-
-    # Create tables
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS artists (
-            id INTEGER PRIMARY KEY,
-            name TEXT
-        )
-    ''')
-
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS albums (
-            id INTEGER PRIMARY KEY,
-            title TEXT,
-            artist_id INTEGER,
-            FOREIGN KEY (artist_id) REFERENCES artists(id)
-        )
-    ''')
-
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS tracks (
-            id INTEGER PRIMARY KEY,
-            name TEXT,
-            album_id INTEGER,
-            milliseconds INTEGER,
-            FOREIGN KEY (album_id) REFERENCES albums(id)
-        )
-    ''')
-
-    # Insert data
-    artists = [
-        (1, 'AC/DC'),
-        (2, 'Accept'),
-        (3, 'Aerosmith'),
-        (4, 'Alanis Morissette'),
-        (5, 'Alice In Chains'),
-    ]
-    c.executemany('INSERT OR IGNORE INTO artists VALUES (?,?)', artists)
-
-    albums = [
-        (1, 'For Those About To Rock We Salute You', 1),
-        (2, 'Balls to the Wall', 2),
-        (3, 'Restless and Wild', 2),
-        (4, 'Let There Be Rock', 1),
-        (5, 'Big Ones', 3),
-    ]
-    c.executemany('INSERT OR IGNORE INTO albums VALUES (?,?,?)', albums)
-
-    tracks = [
-        (1, 'For Those About To Rock (We Salute You)', 1, 343719),
-        (2, 'Balls to the Wall', 2, 342562),
-        (3, 'Fast as a Shark', 3, 230619),
-        (4, 'Restless and Wild', 3, 252051),
-        (5, 'Princess of the Dawn', 3, 375418),
-    ]
-    c.executemany('INSERT OR IGNORE INTO tracks VALUES (?,?,?,?)', tracks)
-
-    conn.commit()
+def get_db_schema(db_path: str) -> pd.DataFrame:
+    """Retrieves the database schema, saves it as a global schema string and returns it as a DataFrame."""
+    conn = sqlite3.connect(db_path)
+    query = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"
+    tables_df = pd.read_sql_query(query, conn)
     conn.close()
 
-if __name__ == '__main__':
-    create_database()
+    db_schema_df = pd.DataFrame()
+    for table_name in tables_df["name"]:
+        db_schema_df = pd.concat([db_schema_df, get_table_schema(db_path, table_name)],
+                  axis=1)
+
+    return db_schema_df.fillna("")
+
+def get_table_schema(db_path: str, table_name: str) -> pd.Series:
+    """Retrieves the schema (columns) for a specified table."""
+    global schema
+    conn = sqlite3.connect(db_path)
+    query = f"PRAGMA table_info('{table_name}');"
+    column_df = pd.read_sql_query(query, conn)
+    conn.close()
+    column_df = column_df.rename(columns={"name": table_name})
+    table_schema = f"Table: {table_name}\\n"
+    for col in column_df[table_name]:
+        table_schema += f"  Column: {col}\\n"
+    schema += table_schema
+    return column_df[table_name]
+
+def get_table_schema_string(db_path: str, table_name) -> str:
+    """
+    Extracts the table schema (name and columns) as a string.
+    """
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()
+        schema = ""
+        for table_name in tables:
+            table_name = table_name[0]
+            schema += f"Table: {table_name}\\n"
+            cursor.execute(f"PRAGMA table_info({table_name});")
+            columns = cursor.fetchall()
+            for col in columns:
+                schema += f"  Column: {col[1]} ({col[2]})\\n"
+    return schema
